@@ -3,7 +3,7 @@ use std::string::FromUtf8Error;
 
 use base64::DecodeError;
 use crypto_common::InvalidLength;
-use digest::MacError;
+use hmac::digest::MacError;
 use serde_json::Error as JsonError;
 
 use self::Error::*;

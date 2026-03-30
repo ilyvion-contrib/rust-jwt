@@ -2,7 +2,7 @@
 //! According to that organization, only hmac is safely implemented at the
 //! moment.
 
-use digest::{
+use hmac::digest::{
     block_buffer::Eager,
     consts::U256,
     core_api::{BlockSizeUser, BufferKindUser, CoreProxy, FixedOutputCore},
@@ -42,7 +42,7 @@ where
     D::Core: HashMarker
         + BufferKindUser<BufferKind = Eager>
         + FixedOutputCore
-        + digest::Reset
+        + hmac::digest::Reset
         + Default
         + Clone,
     <D::Core as BlockSizeUser>::BlockSize: IsLess<U256>,
@@ -66,7 +66,7 @@ where
     D::Core: HashMarker
         + BufferKindUser<BufferKind = Eager>
         + FixedOutputCore
-        + digest::Reset
+        + hmac::digest::Reset
         + Default
         + Clone,
     <D::Core as BlockSizeUser>::BlockSize: IsLess<U256>,
@@ -89,7 +89,7 @@ where
     D::Core: HashMarker
         + BufferKindUser<BufferKind = Eager>
         + FixedOutputCore
-        + digest::Reset
+        + hmac::digest::Reset
         + Default
         + Clone,
     <D::Core as BlockSizeUser>::BlockSize: IsLess<U256>,
