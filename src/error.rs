@@ -2,7 +2,7 @@ use std::fmt;
 use std::string::FromUtf8Error;
 
 use base64::DecodeError;
-use crypto_common::InvalidLength;
+use hmac::digest::InvalidLength;
 use hmac::digest::MacError;
 use serde_json::Error as JsonError;
 

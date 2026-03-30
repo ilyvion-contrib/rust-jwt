@@ -5,14 +5,14 @@
 //! Claims can be any `serde::Serialize` type, usually derived with
 //! `serde_derive`.
 //! ```rust
-//! use hmac::{Hmac, Mac};
+//! use hmac::{HmacReset, KeyInit};
 //! use jwt::SignWithKey;
 //! use sha2::Sha256;
 //! use std::collections::BTreeMap;
 //!
 //! # use jwt::Error;
 //! # fn try_main() -> Result<(), Error> {
-//! let key: Hmac<Sha256> = Hmac::new_from_slice(b"some-secret")?;
+//! let key: HmacReset<Sha256> = HmacReset::new_from_slice(b"some-secret")?;
 //! let mut claims = BTreeMap::new();
 //! claims.insert("sub", "someone");
 //! let token_str = claims.sign_with_key(&key)?;
@@ -25,14 +25,14 @@
 //! Claims can be any `serde::Deserialize` type, usually derived with
 //! `serde_derive`.
 //! ```rust
-//! use hmac::{Hmac, Mac};
+//! use hmac::{HmacReset, KeyInit};
 //! use jwt::VerifyWithKey;
 //! use sha2::Sha256;
 //! use std::collections::BTreeMap;
 //!
 //! # use jwt::Error;
 //! # fn try_main() -> Result<(), Error> {
-//! let key: Hmac<Sha256> = Hmac::new_from_slice(b"some-secret")?;
+//! let key: HmacReset<Sha256> = HmacReset::new_from_slice(b"some-secret")?;
 //! let token_str = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzb21lb25lIn0.5wwE1sBrs-vftww_BGIuTVDeHtc1Jsjo-fiHhDwR8m0";
 //! let claims: BTreeMap<String, String> = token_str.verify_with_key(&key)?;
 //! assert_eq!(claims["sub"], "someone");
@@ -47,14 +47,14 @@
 //! #### Signing
 //! Both header and claims have to implement `serde::Serialize`.
 //! ```rust
-//! use hmac::{Hmac, Mac};
+//! use hmac::{HmacReset, KeyInit};
 //! use jwt::{AlgorithmType, Header, SignWithKey, Token};
 //! use sha2::Sha384;
 //! use std::collections::BTreeMap;
 //!
 //! # use jwt::Error;
 //! # fn try_main() -> Result<(), Error> {
-//! let key: Hmac<Sha384> = Hmac::new_from_slice(b"some-secret")?;
+//! let key: HmacReset<Sha384> = HmacReset::new_from_slice(b"some-secret")?;
 //! let header = Header {
 //!     algorithm: AlgorithmType::Hs384,
 //!     ..Default::default()
@@ -70,14 +70,14 @@
 //! #### Verification
 //! Both header and claims have to implement `serde::Deserialize`.
 //! ```rust
-//! use hmac::{Hmac, Mac};
+//! use hmac::{HmacReset, KeyInit};
 //! use jwt::{AlgorithmType, Header, Token, VerifyWithKey};
 //! use sha2::Sha384;
 //! use std::collections::BTreeMap;
 //!
 //! # use jwt::Error;
 //! # fn try_main() -> Result<(), Error> {
-//! let key: Hmac<Sha384> = Hmac::new_from_slice(b"some-secret")?;
+//! let key: HmacReset<Sha384> = HmacReset::new_from_slice(b"some-secret")?;
 //! let token_str = "eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJzb21lb25lIn0.WM_WnPUkHK6zm6Wz7zk1kmIxz990Te7nlDjQ3vzcye29szZ-Sj47rLNSTJNzpQd_";
 //! let token: Token<Header, BTreeMap<String, String>, _> = token_str.verify_with_key(&key)?;
 //! let header = token.header();
@@ -194,8 +194,8 @@ mod tests {
     use crate::token::verified::VerifyWithKey;
     use crate::Claims;
     use crate::Token;
-    use hmac::Hmac;
-    use hmac::Mac;
+    use hmac::HmacReset;
+    use hmac::KeyInit;
     use sha2::Sha256;
 
     #[test]
@@ -205,7 +205,7 @@ mod tests {
 
         assert_eq!(token.header.algorithm, Hs256);
 
-        let verifier: Hmac<Sha256> = Hmac::new_from_slice(b"secret")?;
+        let verifier: HmacReset<Sha256> = HmacReset::new_from_slice(b"secret")?;
         assert!(token.verify_with_key(&verifier).is_ok());
 
         Ok(())
@@ -214,7 +214,7 @@ mod tests {
     #[test]
     pub fn roundtrip() -> Result<(), Error> {
         let token: Token<Header, Claims, _> = Default::default();
-        let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret")?;
+        let key: HmacReset<Sha256> = HmacReset::new_from_slice(b"secret")?;
         let signed_token = token.sign_with_key(&key)?;
         let signed_token_str = signed_token.as_str();
 
