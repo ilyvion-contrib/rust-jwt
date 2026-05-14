@@ -79,6 +79,9 @@ pub enum HeaderType {
     #[serde(rename = "JWT")]
     JsonWebToken,
 
+    #[serde(rename = "JWS")]
+    JsonWebSignature,
+
     #[serde(rename = "kb+jwt")]
     KeyBindingJwt,
 }
@@ -86,6 +89,7 @@ pub enum HeaderType {
 #[derive(Clone, Debug, PartialEq)]
 pub enum HeaderContentType {
     JsonWebToken,
+    JsonWebSignature,
     Custom(String),
 }
 
@@ -96,6 +100,7 @@ impl Serialize for HeaderContentType {
     {
         match self {
             HeaderContentType::JsonWebToken => serializer.serialize_str("JWT"),
+            HeaderContentType::JsonWebSignature => serializer.serialize_str("JWS"),
             HeaderContentType::Custom(ref ctype) => serializer.serialize_str(ctype),
         }
     }
@@ -120,6 +125,7 @@ impl<'de> Deserialize<'de> for HeaderContentType {
             {
                 Ok(match v {
                     "JWT" => HeaderContentType::JsonWebToken,
+                    "JWS" => HeaderContentType::JsonWebSignature,
                     content_type => HeaderContentType::Custom(content_type.to_string()),
                 })
             }
