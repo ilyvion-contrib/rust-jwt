@@ -59,7 +59,7 @@ impl<C: ToBase64> SignWithKey<String> for C {
     }
 }
 
-impl<'a, C: ToBase64> SignWithStore<String> for (&'a str, C) {
+impl<C: ToBase64> SignWithStore<String> for (&str, C) {
     fn sign_with_store<S, A>(self, store: &S) -> Result<String, Error>
     where
         S: Store<Algorithm = A>,
@@ -124,16 +124,16 @@ where
     }
 }
 
-impl<'a, H, C> Token<H, C, Signed> {
+impl<H, C> Token<H, C, Signed> {
     /// Get the string representation of the token.
     pub fn as_str(&self) -> &str {
         &self.signature.token_string
     }
 }
 
-impl<'a, H: FromBase64, C: FromBase64> Token<H, C, Signed> {
+impl<H: FromBase64, C: FromBase64> Token<H, C, Signed> {
     /// View this token as Unverified, so that it can be verified again
-    pub fn as_unverified(&self) -> Result<Token<H, C, Unverified>, Error> {
+    pub fn as_unverified(&self) -> Result<Token<H, C, Unverified<'_>>, Error> {
         Token::parse_unverified(&self.signature.token_string)
     }
 }

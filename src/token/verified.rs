@@ -64,7 +64,7 @@ impl<'a, H: JoseHeader, C> VerifyWithStore<Token<H, C, Verified>> for Token<H, C
     }
 }
 
-impl<'a, H, C> VerifyWithKey<Token<H, C, Verified>> for &'a str
+impl<H, C> VerifyWithKey<Token<H, C, Verified>> for &str
 where
     H: FromBase64 + JoseHeader,
     C: FromBase64,
@@ -78,7 +78,7 @@ where
     }
 }
 
-impl<'a, H, C> VerifyWithStore<Token<H, C, Verified>> for &'a str
+impl<H, C> VerifyWithStore<Token<H, C, Verified>> for &str
 where
     H: FromBase64 + JoseHeader,
     C: FromBase64,
@@ -93,14 +93,14 @@ where
     }
 }
 
-impl<'a, C: FromBase64> VerifyWithKey<C> for &'a str {
+impl<C: FromBase64> VerifyWithKey<C> for &str {
     fn verify_with_key(self, key: &impl VerifyingAlgorithm) -> Result<C, Error> {
         let token: Token<Header, C, _> = self.verify_with_key(key)?;
         Ok(token.claims)
     }
 }
 
-impl<'a, C: FromBase64> VerifyWithStore<C> for &'a str {
+impl<C: FromBase64> VerifyWithStore<C> for &str {
     fn verify_with_store<S, A>(self, store: &S) -> Result<C, Error>
     where
         S: Store<Algorithm = A>,
@@ -113,7 +113,7 @@ impl<'a, C: FromBase64> VerifyWithStore<C> for &'a str {
 
 impl<'a, H: FromBase64, C: FromBase64> Token<H, C, Unverified<'a>> {
     /// Not recommended. Parse the header and claims without checking the validity of the signature.
-    pub fn parse_unverified(token_str: &str) -> Result<Token<H, C, Unverified>, Error> {
+    pub fn parse_unverified(token_str: &'_ str) -> Result<Token<H, C, Unverified<'_>>, Error> {
         let [header_str, claims_str, signature_str] = split_components(token_str)?;
         let header = H::from_base64(header_str)?;
         let claims = C::from_base64(claims_str)?;

@@ -172,7 +172,7 @@ impl SigningAlgorithm for PKeyWithDigest<Private> {
                 signer.sign_oneshot_to_vec(super::make_body(header, claims).as_slice())?
             }
             _ => {
-                let mut signer = Signer::new(self.digest.clone(), &self.key)?;
+                let mut signer = Signer::new(self.digest, &self.key)?;
                 signer.update(header.as_bytes())?;
                 signer.update(SEPARATOR.as_bytes())?;
                 signer.update(claims.as_bytes())?;
@@ -210,7 +210,7 @@ impl VerifyingAlgorithm for PKeyWithDigest<Public> {
                 Ok(verified)
             }
             _ => {
-                let mut verifier = Verifier::new(self.digest.clone(), &self.key)?;
+                let mut verifier = Verifier::new(self.digest, &self.key)?;
                 verifier.update(header.as_bytes())?;
                 verifier.update(SEPARATOR.as_bytes())?;
                 verifier.update(claims.as_bytes())?;
@@ -230,7 +230,7 @@ impl VerifyingAlgorithm for PKeyWithDigest<Public> {
 
 /// OpenSSL by default signs ECDSA in DER, but JOSE expects them in a concatenated (R, S) format
 fn der_to_jose(der: &[u8]) -> Result<Vec<u8>, Error> {
-    let signature = EcdsaSig::from_der(&der)?;
+    let signature = EcdsaSig::from_der(der)?;
     let r = signature.r().to_vec();
     let s = signature.s().to_vec();
     Ok([r, s].concat())
@@ -257,10 +257,9 @@ mod tests {
     use openssl::pkey::PKey;
 
     // {"sub":"1234567890","name":"John Doe","admin":true}
-    const CLAIMS: &'static str =
-        "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9";
+    const CLAIMS: &str = "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9";
 
-    const RS256_SIGNATURE: &'static str =
+    const RS256_SIGNATURE: &str =
     "cQsAHF2jHvPGFP5zTD8BgoJrnzEx6JNQCpupebWLFnOc2r_punDDTylI6Ia4JZNkvy2dQP-7W-DEbFQ3oaarHsDndqUgwf9iYlDQxz4Rr2nEZX1FX0-FMEgFPeQpdwveCgjtTYUbVy37ijUySN_rW-xZTrsh_Ug-ica8t-zHRIw";
 
     #[test]
@@ -310,7 +309,7 @@ mod tests {
         };
 
         let verification_result =
-            public_key.verify(&AlgOnly(Es256).to_base64()?, CLAIMS, &*signature)?;
+            public_key.verify(&AlgOnly(Es256).to_base64()?, CLAIMS, &signature)?;
         assert!(verification_result);
         Ok(())
     }
@@ -334,7 +333,7 @@ mod tests {
         };
 
         let verification_result =
-            public_key.verify(&AlgOnly(EdDSA).to_base64()?, CLAIMS, &*signature)?;
+            public_key.verify(&AlgOnly(EdDSA).to_base64()?, CLAIMS, &signature)?;
         assert!(verification_result);
         Ok(())
     }

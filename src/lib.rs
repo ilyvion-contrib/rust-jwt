@@ -173,11 +173,11 @@ impl<H, C, S> From<Token<H, C, S>> for (H, C) {
 /// [Serialize](../../serde/trait.Serialize.html). as a base64 encoding of
 /// the object's JSON representation.
 pub trait ToBase64 {
-    fn to_base64(&self) -> Result<Cow<str>, Error>;
+    fn to_base64(&'_ self) -> Result<Cow<'_, str>, Error>;
 }
 
 impl<T: Serialize> ToBase64 for T {
-    fn to_base64(&self) -> Result<Cow<str>, Error> {
+    fn to_base64(&'_ self) -> Result<Cow<'_, str>, Error> {
         use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
         let json_bytes = serde_json::to_vec(&self)?;
         let encoded_json_bytes = BASE64_URL_SAFE_NO_PAD.encode(&json_bytes);

@@ -28,7 +28,9 @@ pub mod store;
 /// [JWA](https://tools.ietf.org/html/rfc7518) specification.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
+#[derive(Default)]
 pub enum AlgorithmType {
+    #[default]
     Hs256,
     Hs384,
     Hs512,
@@ -44,12 +46,6 @@ pub enum AlgorithmType {
     EdDSA,
     #[serde(rename = "none")]
     None,
-}
-
-impl Default for AlgorithmType {
-    fn default() -> Self {
-        AlgorithmType::Hs256
-    }
 }
 
 /// The type of a hash algorithm, according to the [IANA
@@ -117,7 +113,7 @@ pub trait VerifyingAlgorithm {
     fn verify(&self, header: &str, claims: &str, signature: &str) -> Result<bool, Error> {
         use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
         let signature_bytes = BASE64_URL_SAFE_NO_PAD.decode(signature)?;
-        self.verify_bytes(header, claims, &*signature_bytes)
+        self.verify_bytes(header, claims, &signature_bytes)
     }
 }
 

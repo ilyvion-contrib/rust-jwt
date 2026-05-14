@@ -43,7 +43,9 @@ impl Disclosure {
         let salt = random_data(SALT_SIZE);
 
         parts.push(salt.into());
-        key.as_ref().map(|k| parts.push(k.clone().into()));
+        if let Some(k) = key.as_ref() {
+            parts.push(k.clone().into())
+        }
         parts.push(value.clone());
 
         let hash_input = serde_json::to_vec(&parts)?;
@@ -61,12 +63,12 @@ impl Disclosure {
 
     fn as_value(&self, sd_alg: &impl HashAlgorithm) -> Result<Value, Error> {
         let hash = self.hash(sd_alg);
-        serde_json::to_value(Redaction { hash }).map_err(|e| Error::Json(e))
+        serde_json::to_value(Redaction { hash }).map_err(Error::Json)
     }
 }
 
 impl ToBase64 for Disclosure {
-    fn to_base64(&self) -> Result<Cow<str>, Error> {
+    fn to_base64(&'_ self) -> Result<Cow<'_, str>, Error> {
         let encoded_json_bytes = BASE64_URL_SAFE_NO_PAD.encode(&self.hash_input);
         Ok(Cow::Owned(encoded_json_bytes))
     }
@@ -88,21 +90,18 @@ impl FromBase64 for Disclosure {
         let value = values.pop().unwrap();
 
         // Capture the key if present
-        let key: Option<String> = values
-            .pop()
-            .map(|x| serde_json::from_value(x))
-            .transpose()?;
+        let key: Option<String> = values.pop().map(serde_json::from_value).transpose()?;
 
         Ok(Self {
             key,
             value,
-            hash_input: hash_input,
+            hash_input,
         })
     }
 }
 
 trait Redactable {
-    fn find_container<'a>(&'a mut self, hash: String) -> Option<&'a mut Value>;
+    fn find_container(&mut self, hash: String) -> Option<&mut Value>;
     fn find_sd_hash(
         &self,
         _pointer: &str,
@@ -118,7 +117,7 @@ trait Redactable {
 }
 
 impl Redactable for Value {
-    fn find_container<'a>(&'a mut self, hash: String) -> Option<&'a mut Value> {
+    fn find_container(&mut self, hash: String) -> Option<&mut Value> {
         // XXX(RLB) The arrangement of code here is somewhat infelicitous, but necessary to avoid
         // double borrows.
         let found = match self {
@@ -196,7 +195,7 @@ impl Redactable for Value {
                     sd_array.contains(&Some(&hash))
                 })
             }
-            _ => return None,
+            _ => None,
         }
     }
 
@@ -224,7 +223,7 @@ impl Redactable for Value {
                 map.remove(&key);
 
                 let hash_value =
-                    serde_json::to_value(disclosure.hash(sd_alg)).map_err(|e| Error::Json(e))?;
+                    serde_json::to_value(disclosure.hash(sd_alg)).map_err(Error::Json)?;
                 let _sd = map.entry(REDACTION_LIST_FIELD).or_insert(json!([]));
                 _sd.as_array_mut()
                     .ok_or(Error::InvalidPointer)?
@@ -232,7 +231,7 @@ impl Redactable for Value {
 
                 Ok(disclosure)
             }
-            _ => return Err(Error::InvalidPointer),
+            _ => Err(Error::InvalidPointer),
         }
     }
 
@@ -255,9 +254,9 @@ impl Redactable for Value {
                 // Replace the redacted value with the disclosed value
                 let redaction = Redaction { hash: hash.clone() };
                 let redaction_value = serde_json::to_value(redaction).unwrap();
-                vec.iter_mut()
-                    .find(|x| **x == redaction_value)
-                    .map(|x| *x = disclosure.value);
+                if let Some(x) = vec.iter_mut().find(|x| **x == redaction_value) {
+                    *x = disclosure.value;
+                }
                 Ok(())
             }
             Value::Object(map) => {
@@ -276,7 +275,7 @@ impl Redactable for Value {
                 _sd.remove(index);
 
                 // Clean up the _sd field if it is no longer needed
-                if _sd.len() == 0 {
+                if _sd.is_empty() {
                     map.remove(REDACTION_LIST_FIELD);
                 }
 
@@ -328,11 +327,10 @@ impl<H, C, S> Token<H, C, S> {
 
     fn matches_confirmation_key(&self, key: &impl KeyConfirmationAlgorithm) -> Result<(), Error> {
         let raw_claims = self.issuer_jwt.claims().clone();
-        let claims: StandardClaims =
-            serde_json::from_value(raw_claims).map_err(|e| Error::Json(e))?;
+        let claims: StandardClaims = serde_json::from_value(raw_claims).map_err(Error::Json)?;
         let cnf = claims.cnf.ok_or(Error::InvalidConfirmationKey)?;
         cnf.matches(key)
-            .then(|| ())
+            .then_some(())
             .ok_or(Error::InvalidConfirmationKey)
     }
 }
@@ -347,7 +345,7 @@ where
         Self {
             issuer_jwt: self.issuer_jwt.clone(),
             disclosures: self.disclosures.clone(),
-            sd_alg: self.sd_alg.clone(),
+            sd_alg: self.sd_alg,
             signature: self.signature.clone(),
             _phantom: Default::default(),
         }
@@ -388,7 +386,7 @@ impl<H, C: Serialize> Token<H, C, Unsigned> {
 
     pub fn set_confirmation_key(&mut self, cnf: KeyConfirmation) -> Result<(), Error> {
         let claims = self.issuer_jwt.claims_mut().as_object_mut().unwrap();
-        let cnf_value = serde_json::to_value(cnf).map_err(|e| Error::Json(e))?;
+        let cnf_value = serde_json::to_value(cnf).map_err(Error::Json)?;
         claims.insert(CONFIRMATION_KEY_FIELD.into(), cnf_value);
         Ok(())
     }
@@ -402,7 +400,7 @@ where
     fn sign_with_key(self, key: &impl SigningAlgorithm) -> Result<Token<H, C, Signed>, Error> {
         let issuer_jwt = self.issuer_jwt.sign_with_key(key)?;
         let mut token = Token {
-            issuer_jwt: issuer_jwt,
+            issuer_jwt,
             disclosures: self.disclosures,
             sd_alg: self.sd_alg,
             signature: Signed {
@@ -447,17 +445,17 @@ where
     C: FromBase64,
 {
     /// Get a view of this token as unverified, so that it can be verified again
-    pub fn as_unverified(&self) -> Result<Token<H, C, Unverified>, Error> {
+    pub fn as_unverified(&'_ self) -> Result<Token<H, C, Unverified<'_>>, Error> {
         let signature = Unverified {
-            header_str: &"",
-            claims_str: &"",
-            signature_str: &"",
+            header_str: "",
+            claims_str: "",
+            signature_str: "",
         };
 
         Ok(Token {
             issuer_jwt: self.issuer_jwt.as_unverified()?,
             disclosures: self.disclosures.clone(),
-            sd_alg: self.sd_alg.clone(),
+            sd_alg: self.sd_alg,
             signature,
             _phantom: Default::default(),
         })
@@ -506,7 +504,7 @@ impl<H, C> Token<H, C, Signed> {
 
 impl<'a, H: FromBase64, C: FromBase64> Token<H, C, Unverified<'a>> {
     /// Not recommended. Parse the header and claims without checking the validity of the signature.
-    pub fn parse_unverified(token_str: &str) -> Result<Token<H, C, Unverified>, Error> {
+    pub fn parse_unverified(token_str: &'a str) -> Result<Token<H, C, Unverified<'a>>, Error> {
         let mut components = token_str.split(SEPARATOR);
         let issuer_jwt = components.next().ok_or(Error::NoIssuerJwt)?;
 
@@ -522,13 +520,13 @@ impl<'a, H: FromBase64, C: FromBase64> Token<H, C, Unverified<'a>> {
         let issuer_jwt: IssuerJwt<H, _> = crate::Token::parse_unverified(issuer_jwt)?;
         let disclosures: Vec<Disclosure> = raw_disclosures
             .iter()
-            .map(|d| Disclosure::from_base64(d))
+            .map(Disclosure::from_base64)
             .collect::<Result<Vec<_>, _>>()?;
         // We only need this field for type alignment with issuer_jwt
         let signature = Unverified {
-            header_str: &"",
-            claims_str: &"",
-            signature_str: &"",
+            header_str: "",
+            claims_str: "",
+            signature_str: "",
         };
 
         let raw_claims = issuer_jwt.claims().clone();
@@ -568,7 +566,7 @@ impl<H, C: for<'de> Deserialize<'de> + Sized> Token<H, C, Verified> {
             claims.unredact(disclosure, &self.sd_alg)?;
         }
 
-        serde_json::from_value(claims).map_err(|e| Error::Json(e))
+        serde_json::from_value(claims).map_err(Error::Json)
     }
 }
 
@@ -600,7 +598,7 @@ pub struct Presentation<H, C, S> {
 impl<H, C> Presentation<H, C, Unsigned> {
     pub fn new(token: Token<H, C, Signed>, aud: String) -> Self {
         let mut presentation = Self {
-            token: token,
+            token,
             kb_jwt: Default::default(),
             signature: Unsigned,
         };
@@ -653,7 +651,7 @@ impl<H, C> Presentation<H, C, Unsigned> {
             .unwrap()
             .as_secs();
         claims.nonce = random_data(NONCE_SIZE);
-        claims._sd_hash = sd_alg.hash(&token_str);
+        claims._sd_hash = sd_alg.hash(token_str);
 
         let kb_jwt = kb_jwt.sign_with_key(key)?;
 
@@ -662,7 +660,7 @@ impl<H, C> Presentation<H, C, Unsigned> {
 
         Ok(Presentation {
             token: self.token,
-            kb_jwt: kb_jwt,
+            kb_jwt,
             signature: Signed { token_string },
         })
     }
@@ -695,7 +693,7 @@ impl<'a, H: FromBase64, C: FromBase64> Presentation<H, C, Unverified<'a>> {
     /// Not recommended. Parse the header and claims without checking the validity of the signature.
     pub fn parse_unverified(
         presentation_str: &'a str,
-    ) -> Result<Presentation<H, C, Unverified>, Error> {
+    ) -> Result<Presentation<H, C, Unverified<'a>>, Error> {
         let cut = presentation_str
             .rfind("~")
             .ok_or(Error::InvalidPresentation)?;
@@ -708,9 +706,9 @@ impl<'a, H: FromBase64, C: FromBase64> Presentation<H, C, Unverified<'a>> {
         let token: Token<H, C, Signed> = token.into();
         let kb_jwt: KeyBindingJwt<Unverified<'a>> = crate::Token::parse_unverified(kb_jwt_str)?;
         let signature = Unverified {
-            header_str: &"",
-            claims_str: &"",
-            signature_str: &"",
+            header_str: "",
+            claims_str: "",
+            signature_str: "",
         };
 
         Ok(Self {
@@ -735,7 +733,7 @@ impl<'a, H, C> Presentation<H, C, Unverified<'a>> {
         let kb_jwt = self.kb_jwt.verify_with_key(key)?;
 
         // Verify that the SD corresponds to the issuer JWT
-        let sd_hash = sd_alg.hash(&token_str);
+        let sd_hash = sd_alg.hash(token_str);
         let claims = kb_jwt.claims();
         if sd_hash != claims._sd_hash {
             println!("Invalid SD hash match {} != {}", sd_hash, claims._sd_hash);
@@ -768,8 +766,8 @@ mod tests {
     use crate::token::signed::SignWithKey;
     use crate::token::verified::VerifyWithKey;
     use crate::Claims;
-    use hmac::{Hmac, HmacReset};
-    use hmac::{KeyInit as _, Mac};
+    use hmac::HmacReset;
+    use hmac::KeyInit as _;
     use openssl::pkey::{Private, Public};
     use serde_json::{json, Value};
     use sha2::Sha256;
@@ -785,7 +783,7 @@ mod tests {
         let p256 = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let ec_issuer_priv = EcKey::generate(&p256).unwrap();
         let pub_pt = ec_issuer_priv.public_key();
-        let ec_issuer_pub = EcKey::from_public_key(&p256, &pub_pt).unwrap();
+        let ec_issuer_pub = EcKey::from_public_key(&p256, pub_pt).unwrap();
 
         let issuer_priv = PKeyWithDigest {
             digest: MessageDigest::sha256(),

@@ -110,7 +110,7 @@ impl Serialize for StringOrVec {
         S: Serializer,
     {
         if let Some(o) = &self.one {
-            serializer.serialize_str(&o)
+            serializer.serialize_str(o)
         } else if let Some(multi) = &self.multi {
             let mut seq = serializer.serialize_seq(Some(multi.len()))?;
             for e in multi {

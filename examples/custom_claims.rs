@@ -22,7 +22,8 @@ fn new_token(user_id: &str, password: &str) -> Result<String, &'static str> {
     };
     let unsigned_token = Token::new(header, claims);
 
-    let key: HmacReset<Sha256> = HmacReset::new_from_slice(b"secret_key").map_err(|_e| "Invalid key")?;
+    let key: HmacReset<Sha256> =
+        HmacReset::new_from_slice(b"secret_key").map_err(|_e| "Invalid key")?;
 
     let signed_token = unsigned_token
         .sign_with_key(&key)
@@ -31,7 +32,8 @@ fn new_token(user_id: &str, password: &str) -> Result<String, &'static str> {
 }
 
 fn login(token: &str) -> Result<String, &'static str> {
-    let key: HmacReset<Sha256> = HmacReset::new_from_slice(b"secret_key").map_err(|_e| "Invalid key")?;
+    let key: HmacReset<Sha256> =
+        HmacReset::new_from_slice(b"secret_key").map_err(|_e| "Invalid key")?;
 
     let token: Token<Header, Custom, _> =
         VerifyWithKey::verify_with_key(token, &key).map_err(|_e| "Verification failed")?;
@@ -43,7 +45,7 @@ fn login(token: &str) -> Result<String, &'static str> {
 fn main() -> Result<(), &'static str> {
     let token = new_token("Michael Yang", "password")?;
 
-    let logged_in_user = login(&*token)?;
+    let logged_in_user = login(&token)?;
 
     assert_eq!(logged_in_user, "Michael Yang");
     Ok(())
