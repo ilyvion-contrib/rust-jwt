@@ -28,7 +28,7 @@ pub trait JoseHeader {
 
 /// Generic [JWT header](https://tools.ietf.org/html/rfc7519#page-11) with
 /// defined fields for common fields.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Header {
     #[serde(rename = "typ")]
     pub type_: Option<HeaderType>,
