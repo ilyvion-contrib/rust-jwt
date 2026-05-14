@@ -4,10 +4,10 @@
 //! module. The `none` algorithm is explicitly not supported.
 //! ## Examples
 //! ```
-//! use hmac::{Hmac, Mac};
+//! use hmac::{HmacReset, KeyInit};
 //! use sha2::Sha256;
 //!
-//! let hs256_key: Hmac<Sha256> = Hmac::new_from_slice(b"some-secret").unwrap();
+//! let hs256_key: HmacReset<Sha256> = HmacReset::new_from_slice(b"some-secret").unwrap();
 //! ```
 
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine as _};

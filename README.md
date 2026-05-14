@@ -20,12 +20,12 @@ Claims can be any `serde::Serialize` type, usually derived with
 `serde_derive`.
 
 ```rust
-use hmac::{Hmac, Mac};
+use hmac::{HmacReset, KeyInit};
 use jwt::SignWithKey;
 use sha2::Sha256;
 use std::collections::BTreeMap;
 
-let key: Hmac<Sha256> = Hmac::new_from_slice(b"some-secret").unwrap();
+let key: HmacReset<Sha256> = HmacReset::new_from_slice(b"some-secret").unwrap();
 let mut claims = BTreeMap::new();
 claims.insert("sub", "someone");
 
@@ -40,12 +40,12 @@ Claims can be any `serde::Deserialize` type, usually derived with
 `serde_derive`.
 
 ```rust
-use hmac::{Hmac, Mac};
+use hmac::{HmacReset, KeyInit};
 use jwt::VerifyWithKey;
 use sha2::Sha256;
 use std::collections::BTreeMap;
 
-let key: Hmac<Sha256> = Hmac::new_from_slice(b"some-secret").unwrap();
+let key: HmacReset<Sha256> = HmacReset::new_from_slice(b"some-secret").unwrap();
 let token_str = "eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMjU2In0.eyJzdWIiOiJzb21lb25lIn0.Ygdj2-gjqS8RZ0ORCpewqwxvM0lphLiKUK3YthV9t74";
 
 let claims: BTreeMap<String, String> = token_str.verify_with_key(&key).unwrap();
@@ -64,12 +64,12 @@ fields, but any type that implements `JoseHeader` can be used.
 Both header and claims have to implement `serde::Serialize`.
 
 ```rust
-use hmac::{Hmac, Mac};
+use hmac::{HmacReset, KeyInit};
 use jwt::{AlgorithmType, Header, SignWithKey, Token};
 use sha2::Sha384;
 use std::collections::BTreeMap;
 
-let key: Hmac<Sha384> = Hmac::new_from_slice(b"some-secret").unwrap();
+let key: HmacReset<Sha384> = HmacReset::new_from_slice(b"some-secret").unwrap();
 let header = Header {
     algorithm: AlgorithmType::Hs384,
     ..Default::default()
@@ -87,12 +87,12 @@ assert_eq!(token.as_str(), "eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMzg0In0.
 Both header and claims have to implement `serde::Deserialize`.
 
 ```rust
-use hmac::{Hmac, Mac};
+use hmac::{HmacReset, KeyInit};
 use jwt::{AlgorithmType, Header, Token, VerifyWithKey};
 use sha2::Sha384;
 use std::collections::BTreeMap;
 
-let key: Hmac<Sha384> = Hmac::new_from_slice(b"some-secret").unwrap();
+let key: HmacReset<Sha384> = HmacReset::new_from_slice(b"some-secret").unwrap();
 let token_str = "eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMzg0In0.eyJzdWIiOiJzb21lb25lIn0.KF-8bpxR3gmPWgK_167GCs3A-_Yl6xnt7UG4mJI0QIu6uyzKSx7OEduM0QMd9fV2";
 
 let token: Token<Header, BTreeMap<String, String>, _> = VerifyWithKey::verify_with_key(token_str, &key).unwrap();
@@ -104,6 +104,7 @@ assert_eq!(claims["sub"], "someone");
 ```
 
 ### Store
+
 A `Store` can be used to represent a collection of keys indexed by key id. Right now, this is only automatically implemented for `BTreeMap` and `HashMap` with `Borrow<str>` keys. If specialization lands then it will be implemented for all `Index<&str>` traits as it was before.
 
 For the trait `SignWithStore`, the key id will be automatically added to the header for bare claims.
@@ -114,14 +115,14 @@ For the trait `VerifyWithStore`, the key id from the deserialized header will be
 to use.
 
 ```rust
-use hmac::{Hmac, Mac};
+use hmac::{HmacReset, KeyInit};
 use jwt::{Header, SignWithStore, Token, VerifyWithStore};
 use sha2::Sha512;
 use std::collections::BTreeMap;
 
-let mut store: BTreeMap<_, Hmac<Sha512>> = BTreeMap::new();
-store.insert("first_key", Hmac::new_from_slice(b"first").unwrap());
-store.insert("second_key", Hmac::new_from_slice(b"second").unwrap());
+let mut store: BTreeMap<_, HmacReset<Sha512>> = BTreeMap::new();
+store.insert("first_key", HmacReset::new_from_slice(b"first").unwrap());
+store.insert("second_key", HmacReset::new_from_slice(b"second").unwrap());
 
 let mut claims = BTreeMap::new();
 claims.insert("sub", "someone");
@@ -139,12 +140,12 @@ assert_eq!(verified_token.header().key_id.as_ref().unwrap(), "second_key");
 
 Pure Rust HMAC is supported through [RustCrypto](https://github.com/RustCrypto). Implementations of RSA and ECDSA signatures are supported through OpenSSL, which is not enabled by default. OpenSSL types must be wrapped in the [`PKeyWithDigest`](http://mikkyang.github.io/rust-jwt/doc/jwt/algorithm/openssl/struct.PKeyWithDigest.html) struct.
 
-* HS256
-* HS384
-* HS512
-* RS256
-* RS384
-* RS512
-* ES256
-* ES384
-* ES512
+- HS256
+- HS384
+- HS512
+- RS256
+- RS384
+- RS512
+- ES256
+- ES384
+- ES512

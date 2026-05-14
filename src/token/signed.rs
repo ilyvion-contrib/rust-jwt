@@ -167,7 +167,7 @@ impl<'a, H, C> From<Token<H, C, Unverified<'a>>> for Token<H, C, Signed> {
 mod tests {
     use std::collections::BTreeMap;
 
-    use hmac::{Hmac, Mac};
+    use hmac::{HmacReset, KeyInit};
     use serde::Serialize;
     use sha2::{Sha256, Sha512};
 
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     pub fn sign_claims() -> Result<(), Error> {
         let claims = Claims { name: "John Doe" };
-        let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret")?;
+        let key: HmacReset<Sha256> = HmacReset::new_from_slice(b"secret")?;
 
         let signed_token = claims.sign_with_key(&key)?;
 
@@ -196,8 +196,8 @@ mod tests {
     #[test]
     pub fn sign_unsigned_with_store() -> Result<(), Error> {
         let mut key_store = BTreeMap::new();
-        let key1: Hmac<Sha512> = Hmac::new_from_slice(b"first")?;
-        let key2: Hmac<Sha512> = Hmac::new_from_slice(b"second")?;
+        let key1: HmacReset<Sha512> = HmacReset::new_from_slice(b"first")?;
+        let key2: HmacReset<Sha512> = HmacReset::new_from_slice(b"second")?;
         key_store.insert("first_key".to_owned(), key1);
         key_store.insert("second_key".to_owned(), key2);
 

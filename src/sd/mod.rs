@@ -768,8 +768,8 @@ mod tests {
     use crate::token::signed::SignWithKey;
     use crate::token::verified::VerifyWithKey;
     use crate::Claims;
-    use hmac::Hmac;
-    use hmac::Mac;
+    use hmac::{Hmac, HmacReset};
+    use hmac::{KeyInit as _, Mac};
     use openssl::pkey::{Private, Public};
     use serde_json::{json, Value};
     use sha2::Sha256;
@@ -806,7 +806,7 @@ mod tests {
 
         assert_eq!(token.issuer_jwt().header().algorithm, AlgorithmType::Hs256);
 
-        let verifier: Hmac<Sha256> = Hmac::new_from_slice(b"secret")?;
+        let verifier: HmacReset<Sha256> = HmacReset::new_from_slice(b"secret")?;
         let verified = token.verify_with_key(&verifier)?;
         verified.reveal()?;
 
@@ -936,7 +936,7 @@ mod tests {
 
         assert_eq!(token.issuer_jwt().header().algorithm, AlgorithmType::Hs256);
 
-        let verifier: Hmac<Sha256> = Hmac::new_from_slice(b"secret")?;
+        let verifier: HmacReset<Sha256> = HmacReset::new_from_slice(b"secret")?;
         let verified = token.verify_with_key(&verifier)?;
         verified.reveal()?;
 
