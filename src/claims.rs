@@ -51,16 +51,43 @@ pub struct RegisteredClaims {
     pub json_web_token_id: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum StringOrVec {
     String(String),
     Vec(Vec<String>),
 }
 
+impl StringOrVec {
+    pub fn is_string(&self) -> bool {
+        matches!(self, StringOrVec::String(_))
+    }
+
+    pub fn is_string_and(&self, f: impl FnOnce(&str) -> bool) -> bool {
+        matches!(self, StringOrVec::String(s) if f(s))
+    }
+
+    pub fn is_vec(&self) -> bool {
+        matches!(self, StringOrVec::Vec(_))
+    }
+
+    pub fn is_vec_and(&self, f: impl FnOnce(&[String]) -> bool) -> bool {
+        matches!(self, StringOrVec::Vec(v) if f(v))
+    }
+}
+
 impl Default for StringOrVec {
     fn default() -> Self {
         StringOrVec::String(String::new())
+    }
+}
+
+impl std::fmt::Debug for StringOrVec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StringOrVec::String(s) => write!(f, "{}", s),
+            StringOrVec::Vec(v) => write!(f, "{:?}", v),
+        }
     }
 }
 
