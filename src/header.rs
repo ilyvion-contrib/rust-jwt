@@ -75,10 +75,12 @@ impl JoseHeader for Header {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
 pub enum HeaderType {
     #[serde(rename = "JWT")]
     JsonWebToken,
+
+    #[serde(rename = "kb+jwt")]
+    KeyBindingJwt,
 }
 
 #[derive(Clone, Debug, PartialEq)]

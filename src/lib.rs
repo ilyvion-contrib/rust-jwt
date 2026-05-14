@@ -114,6 +114,7 @@ pub mod algorithm;
 pub mod claims;
 pub mod error;
 pub mod header;
+pub mod sd;
 pub mod token;
 
 const SEPARATOR: &str = ".";
@@ -124,6 +125,21 @@ pub struct Token<H, C, S> {
     header: H,
     claims: C,
     signature: S,
+}
+
+impl<H, C, S> Clone for Token<H, C, S>
+where
+    H: Clone,
+    C: Clone,
+    S: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            header: self.header.clone(),
+            claims: self.claims.clone(),
+            signature: self.signature.clone(),
+        }
+    }
 }
 
 impl<H, C, S> Token<H, C, S> {

@@ -2,8 +2,8 @@ use crate::algorithm::store::Store;
 use crate::algorithm::SigningAlgorithm;
 use crate::error::Error;
 use crate::header::{BorrowedKeyHeader, Header, JoseHeader};
-use crate::token::{Signed, Unsigned};
-use crate::{ToBase64, Token, SEPARATOR};
+use crate::token::{Signed, Unsigned, Unverified};
+use crate::{FromBase64, ToBase64, Token, SEPARATOR};
 
 /// Allow objects to be signed with a key.
 pub trait SignWithKey<T> {
@@ -131,9 +131,35 @@ impl<'a, H, C> Token<H, C, Signed> {
     }
 }
 
+impl<'a, H: FromBase64, C: FromBase64> Token<H, C, Signed> {
+    /// View this token as Unverified, so that it can be verified again
+    pub fn as_unverified(&self) -> Result<Token<H, C, Unverified>, Error> {
+        Token::parse_unverified(&self.signature.token_string)
+    }
+}
+
 impl<H, C> From<Token<H, C, Signed>> for String {
     fn from(token: Token<H, C, Signed>) -> Self {
         token.signature.token_string
+    }
+}
+
+impl<'a, H, C> From<Token<H, C, Unverified<'a>>> for Token<H, C, Signed> {
+    fn from(token: Token<H, C, Unverified<'a>>) -> Token<H, C, Signed> {
+        let token_string = [
+            token.signature.header_str,
+            token.signature.claims_str,
+            token.signature.signature_str,
+        ]
+        .join(SEPARATOR);
+
+        let signature = Signed { token_string };
+
+        Token {
+            header: token.header,
+            claims: token.claims,
+            signature,
+        }
     }
 }
 

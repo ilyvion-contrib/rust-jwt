@@ -10,7 +10,9 @@
 //! let hs256_key: Hmac<Sha256> = Hmac::new_from_slice(b"some-secret").unwrap();
 //! ```
 
+use rand::Rng;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::error::Error;
 
@@ -49,6 +51,54 @@ impl Default for AlgorithmType {
     }
 }
 
+/// The type of a hash algorithm, according to the [IANA
+/// Registry](https://www.iana.org/assignments/named-information/named-information.xhtml)
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum HashAlgorithmType {
+    #[serde(rename = "sha-256")]
+    Sha256,
+
+    #[serde(rename = "sha-384")]
+    Sha384,
+
+    #[serde(rename = "sha-512")]
+    Sha512,
+}
+
+/// Mechanisms for associating a proof-of-possession key with a JWT
+#[derive(PartialEq, Serialize, Deserialize)]
+pub enum KeyConfirmation {
+    #[serde(rename = "jwk")]
+    Jwk(Value),
+
+    #[serde(rename = "jkt")]
+    JwkThumbprint(String),
+}
+
+impl KeyConfirmation {
+    pub fn matches(&self, key: &impl KeyConfirmationAlgorithm) -> bool {
+        match self {
+            KeyConfirmation::Jwk(_) => *self == key.jwk_confirmation(),
+            KeyConfirmation::JwkThumbprint(_) => *self == key.jwk_thumbprint_confirmation(),
+        }
+    }
+}
+
+/// An algorithm capable of being used as a ProofOfPossession JWT
+pub trait KeyConfirmationAlgorithm {
+    fn as_jwk(&self) -> Value;
+
+    fn thumbprint(&self) -> String;
+
+    fn jwk_confirmation(&self) -> KeyConfirmation {
+        KeyConfirmation::Jwk(self.as_jwk())
+    }
+
+    fn jwk_thumbprint_confirmation(&self) -> KeyConfirmation {
+        KeyConfirmation::JwkThumbprint(self.thumbprint())
+    }
+}
+
 /// An algorithm capable of signing base64 encoded header and claims strings.
 /// strings.
 pub trait SigningAlgorithm {
@@ -67,6 +117,21 @@ pub trait VerifyingAlgorithm {
         let signature_bytes = base64::decode_config(signature, base64::URL_SAFE_NO_PAD)?;
         self.verify_bytes(header, claims, &*signature_bytes)
     }
+}
+
+/// A hash algorithm
+pub trait HashAlgorithm {
+    fn hash_algorithm_type(&self) -> HashAlgorithmType;
+
+    fn hash(&self, data: impl AsRef<[u8]>) -> String;
+}
+
+/// Generate random data
+pub(crate) fn random_data(len: usize) -> String {
+    let mut vec = vec![0; len];
+    let mut rng = rand::thread_rng();
+    rng.fill(vec.as_mut_slice());
+    base64::encode_config(vec, base64::URL_SAFE_NO_PAD)
 }
 
 // TODO: investigate if these AsRef impls are necessary

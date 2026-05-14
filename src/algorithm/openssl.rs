@@ -13,16 +13,32 @@
 //! };
 //! ```
 
-use crate::algorithm::{AlgorithmType, SigningAlgorithm, VerifyingAlgorithm};
+use crate::algorithm::{
+    AlgorithmType, HashAlgorithm, HashAlgorithmType, KeyConfirmationAlgorithm, SigningAlgorithm,
+    VerifyingAlgorithm,
+};
 use crate::error::Error;
-use crate::SEPARATOR;
+use crate::{ToBase64, SEPARATOR};
 
-use openssl::bn::BigNum;
+use std::collections::HashMap;
+
+use openssl::bn::{BigNum, BigNumContext};
 use openssl::ecdsa::EcdsaSig;
 use openssl::hash::MessageDigest;
 use openssl::nid::Nid;
-use openssl::pkey::{Id, PKey, Private, Public};
+use openssl::pkey::{HasParams, HasPublic, Id, PKey, Private, Public};
 use openssl::sign::{Signer, Verifier};
+
+use serde_json::Value;
+
+fn to_curve_name(alg_type: AlgorithmType) -> &'static str {
+    match alg_type {
+        AlgorithmType::Es256 => "P256",
+        AlgorithmType::Es384 => "P384",
+        AlgorithmType::Es512 => "P521",
+        _ => panic!("Invalid algorithm type"),
+    }
+}
 
 /// A wrapper class around [PKey](../../../openssl/pkey/struct.PKey.html) that
 /// associates the key with a
@@ -46,6 +62,97 @@ impl<T> PKeyWithDigest<T> {
             (Id::ED448, Nid::UNDEF) => AlgorithmType::EdDSA,
             _ => panic!("Invalid algorithm type"),
         }
+    }
+}
+
+impl<T> PKeyWithDigest<T>
+where
+    T: HasParams + HasPublic,
+{
+    fn as_ec_jwk_parts(&self) -> (&'static str, String, String) {
+        let ec = self.key.ec_key().unwrap();
+        let group = ec.group();
+        let pubkey = ec.public_key();
+
+        let mut x = BigNum::new().unwrap();
+        let mut y = BigNum::new().unwrap();
+        let mut ctx = BigNumContext::new().unwrap();
+        pubkey
+            .affine_coordinates(group, &mut x, &mut y, &mut ctx)
+            .unwrap();
+
+        let crv = to_curve_name(self.algorithm_type());
+
+        let x = x.to_vec();
+        let x: String = x.to_base64().unwrap().into();
+
+        let y = y.to_vec();
+        let y: String = y.to_base64().unwrap().into();
+
+        (crv, x, y)
+    }
+
+    fn as_rsa_jwk_parts(&self) -> (String, String) {
+        let rsa = self.key.rsa().unwrap();
+        let n = rsa.n().to_vec();
+        let e = rsa.e().to_vec();
+
+        (n.to_base64().unwrap().into(), e.to_base64().unwrap().into())
+    }
+}
+
+impl<T> KeyConfirmationAlgorithm for PKeyWithDigest<T>
+where
+    T: HasParams + HasPublic,
+{
+    fn as_jwk(&self) -> Value {
+        const JWK_KEY_KTY: &str = "kty";
+        const JWK_KTY_RSA: &str = "RSA";
+        const JWK_KTY_EC: &str = "EC";
+        const JWK_KEY_N: &str = "n";
+        const JWK_KEY_E: &str = "e";
+        const JWK_KEY_CRV: &str = "crv";
+        const JWK_KEY_X: &str = "x";
+        const JWK_KEY_Y: &str = "y";
+
+        let raw: HashMap<String, String> = match self.key.id() {
+            Id::RSA => {
+                let (n, e) = self.as_rsa_jwk_parts();
+                HashMap::from([
+                    (JWK_KEY_KTY.into(), JWK_KTY_RSA.into()),
+                    (JWK_KEY_N.into(), n),
+                    (JWK_KEY_E.into(), e),
+                ])
+            }
+            Id::EC => {
+                let (crv, x, y) = self.as_ec_jwk_parts();
+                HashMap::from([
+                    (JWK_KEY_KTY.into(), JWK_KTY_EC.into()),
+                    (JWK_KEY_CRV.into(), crv.into()),
+                    (JWK_KEY_X.into(), x.to_base64().unwrap().into()),
+                    (JWK_KEY_Y.into(), y.to_base64().unwrap().into()),
+                ])
+            }
+            _ => panic!("Invalid algorithm type"),
+        };
+
+        serde_json::to_value(raw).unwrap()
+    }
+
+    fn thumbprint(&self) -> String {
+        let hash_input = match self.key.id() {
+            Id::RSA => {
+                let (n, e) = self.as_rsa_jwk_parts();
+                format!(r#"{{"e":"{}","kty":"RSA","n":"{}"}}"#, e, n)
+            }
+            Id::EC => {
+                let (crv, x, y) = self.as_ec_jwk_parts();
+                format!(r#"{{"crv":"{}","kty":"EC","n":"{}","n":"{}"}}"#, crv, x, y)
+            }
+            _ => panic!("Invalid algorithm type"),
+        };
+
+        HashAlgorithmType::Sha256.hash(hash_input)
     }
 }
 

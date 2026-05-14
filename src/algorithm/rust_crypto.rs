@@ -11,9 +11,12 @@ use digest::{
 };
 use hmac::{Hmac, Mac};
 
-use crate::algorithm::{AlgorithmType, SigningAlgorithm, VerifyingAlgorithm};
+use crate::algorithm::{
+    AlgorithmType, HashAlgorithm, HashAlgorithmType, SigningAlgorithm, VerifyingAlgorithm,
+};
 use crate::error::Error;
 use crate::SEPARATOR;
+
 /// A trait used to make the implementation of `SigningAlgorithm` and
 /// `VerifyingAlgorithm` easier.
 /// RustCrypto crates tend to have algorithm types defined at the type level,
@@ -103,9 +106,51 @@ where
     hmac
 }
 
+/// A trait used to make the implementation of `HashAlgorithm` easier.
+pub trait TypeLevelHashAlgorithmType {
+    fn hash_algorithm_type() -> HashAlgorithmType;
+}
+
+macro_rules! type_level_hash_algorithm_type {
+    ($rust_crypto_type: ty, $hash_algorithm_type: expr) => {
+        impl TypeLevelHashAlgorithmType for $rust_crypto_type {
+            fn hash_algorithm_type() -> HashAlgorithmType {
+                $hash_algorithm_type
+            }
+        }
+    };
+}
+
+type_level_hash_algorithm_type!(sha2::Sha256, HashAlgorithmType::Sha256);
+type_level_hash_algorithm_type!(sha2::Sha384, HashAlgorithmType::Sha384);
+type_level_hash_algorithm_type!(sha2::Sha512, HashAlgorithmType::Sha512);
+
+impl HashAlgorithmType {
+    fn hash<D: sha2::Digest>(data: impl AsRef<[u8]>) -> String {
+        let hash = D::digest(data);
+        base64::encode_config(&hash, base64::URL_SAFE_NO_PAD)
+    }
+}
+
+impl HashAlgorithm for HashAlgorithmType {
+    fn hash_algorithm_type(&self) -> HashAlgorithmType {
+        *self
+    }
+
+    fn hash(&self, data: impl AsRef<[u8]>) -> String {
+        match self {
+            HashAlgorithmType::Sha256 => Self::hash::<sha2::Sha256>(data),
+            HashAlgorithmType::Sha384 => Self::hash::<sha2::Sha384>(data),
+            HashAlgorithmType::Sha512 => Self::hash::<sha2::Sha512>(data),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::algorithm::{SigningAlgorithm, VerifyingAlgorithm};
+    use crate::algorithm::{
+        HashAlgorithm, HashAlgorithmType, SigningAlgorithm, VerifyingAlgorithm,
+    };
     use crate::error::Error;
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
@@ -133,6 +178,28 @@ mod tests {
         assert!(VerifyingAlgorithm::verify(
             &verifier, header, claims, signature
         )?);
+        Ok(())
+    }
+
+    #[test]
+    pub fn hash() -> Result<(), Error> {
+        let data = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
+        let expected256 = "0yjVF-CQYNGq008_sS2Cq46aFdgQMmOGmHWK3ThalFQ";
+        let expected384 = "rq15ikLx7wdNTa-hJyb1h-bYKf7UDytFnchjyljXrDPYkyezDA_ObYDSHuOUExWw";
+        let expected512 = "2eCqV6wY58t5LN2bOvE8c4ewW7yA9UH9A4fow7z6AVwxdJqdlvgS8bJ-1wmeZBe6Es5rdqAi--U7p8SHDrcH7Q";
+
+        let hash = HashAlgorithmType::Sha256;
+        assert_eq!(hash.hash_algorithm_type(), HashAlgorithmType::Sha256);
+        assert_eq!(hash.hash(data), expected256);
+
+        let hash = HashAlgorithmType::Sha384;
+        assert_eq!(hash.hash_algorithm_type(), HashAlgorithmType::Sha384);
+        assert_eq!(hash.hash(data), expected384);
+
+        let hash = HashAlgorithmType::Sha512;
+        assert_eq!(hash.hash_algorithm_type(), HashAlgorithmType::Sha512);
+        assert_eq!(hash.hash(data), expected512);
+
         Ok(())
     }
 }
