@@ -22,13 +22,14 @@ use crate::{ToBase64, SEPARATOR};
 
 use std::collections::HashMap;
 
+use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+use base64::Engine as _;
 use openssl::bn::{BigNum, BigNumContext};
 use openssl::ecdsa::EcdsaSig;
 use openssl::hash::MessageDigest;
 use openssl::nid::Nid;
 use openssl::pkey::{HasParams, HasPublic, Id, PKey, Private, Public};
 use openssl::sign::{Signer, Verifier};
-
 use serde_json::Value;
 
 fn to_curve_name(alg_type: AlgorithmType) -> &'static str {
@@ -169,7 +170,7 @@ impl SigningAlgorithm for PKeyWithDigest<Private> {
                 let mut signer = Signer::new_without_digest(&self.key)?;
 
                 signer.sign_oneshot_to_vec(super::make_body(header, claims).as_slice())?
-            },
+            }
             _ => {
                 let mut signer = Signer::new(self.digest.clone(), &self.key)?;
                 signer.update(header.as_bytes())?;
@@ -186,7 +187,7 @@ impl SigningAlgorithm for PKeyWithDigest<Private> {
             signer_signature
         };
 
-        Ok(base64::encode_config(&signature, base64::URL_SAFE_NO_PAD))
+        Ok(BASE64_URL_SAFE_NO_PAD.encode(&signature))
     }
 }
 
@@ -203,10 +204,11 @@ impl VerifyingAlgorithm for PKeyWithDigest<Public> {
                 let mut verifier = Verifier::new_without_digest(&self.key)?;
 
                 // note that Ed25519 signatures do not need to be converted to/from a DER format
-                let verified = verifier.verify_oneshot(signature, super::make_body(header, claims).as_slice())?;
+                let verified = verifier
+                    .verify_oneshot(signature, super::make_body(header, claims).as_slice())?;
 
                 Ok(verified)
-            },
+            }
             _ => {
                 let mut verifier = Verifier::new(self.digest.clone(), &self.key)?;
                 verifier.update(header.as_bytes())?;

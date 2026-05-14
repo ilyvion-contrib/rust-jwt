@@ -10,16 +10,17 @@
 //! let hs256_key: Hmac<Sha256> = Hmac::new_from_slice(b"some-secret").unwrap();
 //! ```
 
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine as _};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error::Error;
 
-#[cfg(feature = "openssl")]
-pub mod openssl;
 #[cfg(feature = "ed25519-dalek")]
 pub mod ed25519_dalek;
+#[cfg(feature = "openssl")]
+pub mod openssl;
 pub mod rust_crypto;
 pub mod store;
 
@@ -114,7 +115,8 @@ pub trait VerifyingAlgorithm {
     fn verify_bytes(&self, header: &str, claims: &str, signature: &[u8]) -> Result<bool, Error>;
 
     fn verify(&self, header: &str, claims: &str, signature: &str) -> Result<bool, Error> {
-        let signature_bytes = base64::decode_config(signature, base64::URL_SAFE_NO_PAD)?;
+        use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+        let signature_bytes = BASE64_URL_SAFE_NO_PAD.decode(signature)?;
         self.verify_bytes(header, claims, &*signature_bytes)
     }
 }
@@ -131,7 +133,7 @@ pub(crate) fn random_data(len: usize) -> String {
     let mut vec = vec![0; len];
     let mut rng = rand::thread_rng();
     rng.fill(vec.as_mut_slice());
-    base64::encode_config(vec, base64::URL_SAFE_NO_PAD)
+    BASE64_URL_SAFE_NO_PAD.encode(vec)
 }
 
 // TODO: investigate if these AsRef impls are necessary
@@ -154,7 +156,6 @@ impl<T: AsRef<dyn SigningAlgorithm>> SigningAlgorithm for T {
         self.as_ref().sign(header, claims)
     }
 }
-
 
 fn make_body(header: &str, claims: &str) -> Vec<u8> {
     let mut body = vec![];

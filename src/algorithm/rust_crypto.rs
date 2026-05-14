@@ -2,6 +2,7 @@
 //! According to that organization, only hmac is safely implemented at the
 //! moment.
 
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine as _};
 use digest::{
     block_buffer::Eager,
     consts::U256,
@@ -56,10 +57,11 @@ where
     }
 
     fn sign(&self, header: &str, claims: &str) -> Result<String, Error> {
+        use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
         let hmac = get_hmac_with_data(self, header, claims);
         let mac_result = hmac.finalize();
         let code = mac_result.into_bytes();
-        Ok(base64::encode_config(&code, base64::URL_SAFE_NO_PAD))
+        Ok(BASE64_URL_SAFE_NO_PAD.encode(&code))
     }
 }
 
@@ -128,7 +130,7 @@ type_level_hash_algorithm_type!(sha2::Sha512, HashAlgorithmType::Sha512);
 impl HashAlgorithmType {
     fn hash<D: sha2::Digest>(data: impl AsRef<[u8]>) -> String {
         let hash = D::digest(data);
-        base64::encode_config(&hash, base64::URL_SAFE_NO_PAD)
+        BASE64_URL_SAFE_NO_PAD.encode(&hash)
     }
 }
 

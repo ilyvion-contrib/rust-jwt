@@ -8,6 +8,8 @@ use crate::token::signed::SignWithKey;
 use crate::token::verified::VerifyWithKey;
 use crate::token::{Signed, Unsigned, Unverified, Verified};
 use crate::{FromBase64, ToBase64};
+use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+use base64::Engine as _;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::borrow::Cow;
@@ -65,14 +67,14 @@ impl Disclosure {
 
 impl ToBase64 for Disclosure {
     fn to_base64(&self) -> Result<Cow<str>, Error> {
-        let encoded_json_bytes = base64::encode_config(&self.hash_input, base64::URL_SAFE_NO_PAD);
+        let encoded_json_bytes = BASE64_URL_SAFE_NO_PAD.encode(&self.hash_input);
         Ok(Cow::Owned(encoded_json_bytes))
     }
 }
 
 impl FromBase64 for Disclosure {
     fn from_base64<Input: ?Sized + AsRef<[u8]>>(raw: &Input) -> Result<Self, Error> {
-        let hash_input = base64::decode_config(raw, base64::URL_SAFE_NO_PAD)?;
+        let hash_input = BASE64_URL_SAFE_NO_PAD.decode(raw)?;
 
         let mut values: Vec<Value> = serde_json::from_slice(&hash_input)?;
         if values.len() != 2 && values.len() != 3 {
