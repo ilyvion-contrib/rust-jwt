@@ -2,9 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use serde::de::{value, Error, SeqAccess, Visitor};
-use serde::ser::SerializeSeq;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 /// Generic [JWT claims](https://tools.ietf.org/html/rfc7519#page-8) with
 /// defined fields for registered and private claims.
@@ -53,79 +51,104 @@ pub struct RegisteredClaims {
     pub json_web_token_id: Option<String>,
 }
 
-/// Struct to handle the `aud` field because the JWT spec says that
-/// it can be either a string or an array of strings.
-/// [Audience Claim Specificatgion](https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.3).
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct StringOrVec {
-    one: Option<String>,
-    multi: Option<Vec<String>>,
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum StringOrVec {
+    String(String),
+    Vec(Vec<String>),
 }
 
-struct StringOrVecVisitor;
-
-impl<'de> Visitor<'de> for StringOrVecVisitor {
-    type Value = StringOrVec;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("a string or an array of strings")
-    }
-
-    fn visit_str<E>(self, value: &str) -> Result<StringOrVec, E>
-    where
-        E: Error,
-    {
-        Ok(StringOrVec {
-            one: Some(value.to_string()),
-            multi: None,
-        })
-    }
-
-    fn visit_seq<S>(self, seq: S) -> Result<StringOrVec, S::Error>
-    where
-        S: SeqAccess<'de>,
-    {
-        match Deserialize::deserialize(value::SeqAccessDeserializer::new(seq)) {
-            Ok(r) => Ok(StringOrVec {
-                one: None,
-                multi: Some(r),
-            }),
-            Err(e) => Err(e),
-        }
+impl Default for StringOrVec {
+    fn default() -> Self {
+        StringOrVec::String(String::new())
     }
 }
 
-impl<'de> Deserialize<'de> for StringOrVec {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_any(StringOrVecVisitor)
+impl From<String> for StringOrVec {
+    fn from(s: String) -> Self {
+        StringOrVec::String(s)
     }
 }
 
-impl Serialize for StringOrVec {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        if let Some(o) = &self.one {
-            serializer.serialize_str(o)
-        } else if let Some(multi) = &self.multi {
-            let mut seq = serializer.serialize_seq(Some(multi.len()))?;
-            for e in multi {
-                seq.serialize_element(&e)?;
-            }
-            seq.end()
-        } else {
-            serializer.serialize_none()
-        }
+impl From<Vec<String>> for StringOrVec {
+    fn from(v: Vec<String>) -> Self {
+        StringOrVec::Vec(v)
     }
 }
+
+// /// Struct to handle the `aud` field because the JWT spec says that
+// /// it can be either a string or an array of strings.
+// /// [Audience Claim Specificatgion](https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.3).
+// #[derive(Clone, Debug, Default, PartialEq)]
+// pub struct StringOrVec {
+//     one: Option<String>,
+//     multi: Option<Vec<String>>,
+// }
+
+// struct StringOrVecVisitor;
+
+// impl<'de> Visitor<'de> for StringOrVecVisitor {
+//     type Value = StringOrVec;
+
+//     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         formatter.write_str("a string or an array of strings")
+//     }
+
+//     fn visit_str<E>(self, value: &str) -> Result<StringOrVec, E>
+//     where
+//         E: Error,
+//     {
+//         Ok(StringOrVec {
+//             one: Some(value.to_string()),
+//             multi: None,
+//         })
+//     }
+
+//     fn visit_seq<S>(self, seq: S) -> Result<StringOrVec, S::Error>
+//     where
+//         S: SeqAccess<'de>,
+//     {
+//         match Deserialize::deserialize(value::SeqAccessDeserializer::new(seq)) {
+//             Ok(r) => Ok(StringOrVec {
+//                 one: None,
+//                 multi: Some(r),
+//             }),
+//             Err(e) => Err(e),
+//         }
+//     }
+// }
+
+// impl<'de> Deserialize<'de> for StringOrVec {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         deserializer.deserialize_any(StringOrVecVisitor)
+//     }
+// }
+
+// impl Serialize for StringOrVec {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         if let Some(o) = &self.one {
+//             serializer.serialize_str(o)
+//         } else if let Some(multi) = &self.multi {
+//             let mut seq = serializer.serialize_seq(Some(multi.len()))?;
+//             for e in multi {
+//                 seq.serialize_element(&e)?;
+//             }
+//             seq.end()
+//         } else {
+//             serializer.serialize_none()
+//         }
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
-    use crate::claims::Claims;
+    use crate::claims::{Claims, StringOrVec};
     use crate::error::Error;
     use crate::{FromBase64, ToBase64};
     use serde_json::Value;
@@ -173,9 +196,7 @@ mod tests {
 
         let aud = &claims.registered.audience.unwrap();
 
-        assert_eq!(aud.one, Some("test".to_string()));
-        assert_eq!(aud.multi, None);
-
+        assert_eq!(aud, &StringOrVec::String("test".to_string()));
         Ok(())
     }
 
@@ -190,10 +211,10 @@ mod tests {
 
         let aud = &claims.registered.audience.unwrap();
 
-        assert_eq!(aud.one, None);
-        assert_eq!(aud.multi.as_ref().unwrap().len(), 2);
-        assert_eq!(aud.multi.as_ref().unwrap()[0], "test1".to_string());
-        assert_eq!(aud.multi.as_ref().unwrap()[1], "test2".to_string());
+        assert_eq!(
+            aud,
+            &StringOrVec::Vec(vec!["test1".to_string(), "test2".to_string()])
+        );
         Ok(())
     }
 }
