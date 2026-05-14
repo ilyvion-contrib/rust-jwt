@@ -267,7 +267,7 @@ mod tests {
         };
 
         assert_eq!(
-            r#"{"alg":"HS256","cty":"some-test"}"#,
+            r#"{"typ":null,"kid":null,"alg":"HS256","cty":"some-test"}"#,
             serde_json::to_string(&header)?
         );
         Ok(())
@@ -283,7 +283,7 @@ mod tests {
         };
 
         assert_eq!(
-            r#"{"alg":"HS256","cty":"JWT"}"#,
+            r#"{"typ":null,"kid":null,"alg":"HS256","cty":"JWT"}"#,
             serde_json::to_string(&header)?
         );
         Ok(())
